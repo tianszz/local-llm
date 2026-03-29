@@ -1,4 +1,5 @@
 from mlx_lm import load, stream_generate
+from mlx_lm.sample_utils import make_sampler
 import argparse
 import os
 from pathlib import Path
@@ -38,9 +39,10 @@ def main():
 
         print("Assistant: ", end="", flush=True)
         response = ""
-        for token in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, temperature=args.temp):
-            print(token, end="", flush=True)
-            response += token
+        sampler = make_sampler(temp=args.temp)
+        for chunk in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, sampler=sampler):
+            print(chunk.text, end="", flush=True)
+            response += chunk.text
         print("\n")
 
         messages.append({"role": "assistant", "content": response})
