@@ -38,7 +38,7 @@ def main():
 
         print("Assistant: ", end="", flush=True)
         response = ""
-        for token in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, temp=args.temp):
+        for token in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, temperature=args.temp):
             print(token, end="", flush=True)
             response += token
         print("\n")
