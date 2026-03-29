@@ -43,7 +43,7 @@ def main():
         for chunk in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, sampler=sampler):
             print(chunk.text, end="", flush=True)
             response += chunk.text
-        print("\n")
+        print(f"\n\n[{chunk.generation_tokens} tokens, {chunk.generation_tps:.1f} tok/s]\n")
 
         messages.append({"role": "assistant", "content": response})
 
