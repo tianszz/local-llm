@@ -59,7 +59,8 @@ Small models that work well with MLX on Apple Silicon:
 
 | Model | Size | Notes |
 |---|---|---|
-| `mlx-community/Mistral-7B-Instruct-v0.3-4bit` | ~4GB | Current default |
+| `mlx-community/Mistral-7B-Instruct-v0.3-4bit` | ~4GB | — |
+| `mlx-community/Qwen2.5-7B-Instruct-4bit` | ~4.3GB | Current default |
 | `mlx-community/Llama-3.2-3B-Instruct-4bit` | ~2GB | Lighter option |
 | `mlx-community/Qwen2.5-7B-Instruct-4bit` | ~4GB | Strong at coding |
 | `mlx-community/phi-4-4bit` | ~8GB | Strong reasoning |
