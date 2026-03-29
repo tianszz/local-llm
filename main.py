@@ -1,9 +1,45 @@
-from mlx_lm import load, generate
+from mlx_lm import load, stream_generate
+import argparse
 
-model, tokenizer = load("mlx-community/Qwen2.5-7B-Instruct-4bit")
+DEFAULT_MODEL = "mlx-community/Qwen2.5-7B-Instruct-4bit"
 
-prompt = "What is the capital of France?"
-messages = [{"role": "user", "content": prompt}]
-text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
-response = generate(model, tokenizer, prompt=text, max_tokens=200, verbose=True)
+def main():
+    parser = argparse.ArgumentParser(description="Local LLM chat")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--max-tokens", type=int, default=512)
+    parser.add_argument("--temp", type=float, default=0.7)
+    args = parser.parse_args()
+
+    print(f"Loading {args.model}...")
+    model, tokenizer = load(args.model)
+    print("Ready. Ctrl+C to exit.\n")
+
+    messages = []
+
+    while True:
+        try:
+            prompt = input("You: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            break
+        if not prompt:
+            continue
+
+        messages.append({"role": "user", "content": prompt})
+        text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
+        print("Assistant: ", end="", flush=True)
+        response = ""
+        for token in stream_generate(model, tokenizer, prompt=text, max_tokens=args.max_tokens, temp=args.temp):
+            print(token, end="", flush=True)
+            response += token
+        print("\n")
+
+        messages.append({"role": "assistant", "content": response})
+
+
+if __name__ == "__main__":
+    main()
