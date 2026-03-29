@@ -1,7 +1,12 @@
 from mlx_lm import load, stream_generate
 import argparse
+import os
+from pathlib import Path
 
 DEFAULT_MODEL = "mlx-community/Qwen2.5-7B-Instruct-4bit"
+MODELS_DIR = Path.home() / ".local-llm" / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+os.environ["HF_HUB_CACHE"] = str(MODELS_DIR)
 
 
 def main():
