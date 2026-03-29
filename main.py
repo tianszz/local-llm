@@ -1,6 +1,6 @@
 from mlx_lm import load, generate
 
-model, tokenizer = load("mlx-community/Mistral-7B-Instruct-v0.3-4bit")
+model, tokenizer = load("mlx-community/Qwen2.5-7B-Instruct-4bit")
 
 prompt = "What is the capital of France?"
 messages = [{"role": "user", "content": prompt}]
