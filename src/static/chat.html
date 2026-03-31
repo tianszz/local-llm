@@ -13,29 +13,123 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
+    /* ── Header ── */
     header {
       background: #1a1a1a;
       color: #fff;
-      padding: 12px 20px;
-      font-size: 14px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header .logo { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    header .kind-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #333;
+      color: #aaa;
+      font-family: monospace;
+    }
+    header .kind-badge.vlm { background: #1a3a1a; color: #6f6; }
+    header select {
+      flex: 1;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+      min-width: 0;
+    }
+    header select option { background: #1a1a1a; }
+    header button {
+      background: #fff;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    header button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 6px 16px;
+      display: flex;
       gap: 8px;
       flex-shrink: 0;
     }
-
-    header .model {
-      color: #888;
+    #toolbar button {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 4px 10px;
       font-size: 12px;
-      font-family: monospace;
+      cursor: pointer;
+      color: #555;
     }
+    #toolbar button:hover { background: #f5f5f5; }
+    #toolbar button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
+    /* ── System panel ── */
+    #system-panel {
+      background: #fafafa;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 12px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #system-panel.open { display: flex; }
+    #system-panel label { font-size: 12px; color: #666; }
+    #system-panel textarea {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+    }
+    #system-panel textarea:focus { border-color: #aaa; }
+    #system-panel .row { display: flex; gap: 8px; align-items: center; }
+    #system-panel select {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      outline: none;
+      background: #fff;
+    }
+    #system-panel .apply-btn {
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #system-panel .status { font-size: 11px; color: #4caf50; }
+
+    /* ── Messages ── */
     #messages {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 20px;
+      padding: 20px 16px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -50,14 +144,19 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     .user {
       background: #1a1a1a;
       color: #fff;
       align-self: flex-end;
       border-bottom-right-radius: 3px;
     }
-
+    .user img.thumb {
+      display: block;
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
     .assistant {
       background: #fff;
       color: #1a1a1a;
@@ -65,29 +164,70 @@
       border-bottom-left-radius: 3px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-
     .assistant.streaming::after {
       content: '▋';
       animation: blink 0.8s step-end infinite;
     }
-
     @keyframes blink { 50% { opacity: 0; } }
 
+    /* ── Input area ── */
     #input-area {
       background: #fff;
       border-top: 1px solid #e5e5e5;
-      padding: 14px 20px;
+      padding: 12px 16px;
       display: flex;
-      gap: 10px;
-      align-items: flex-end;
+      flex-direction: column;
+      gap: 8px;
       flex-shrink: 0;
     }
-
+    #image-preview {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    #image-preview.visible { display: flex; }
+    #image-preview img {
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+    }
+    #image-preview button {
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    #attach-btn {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: #555;
+    }
+    #attach-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #attach-btn.has-image { border-color: #4caf50; color: #4caf50; }
+    #file-input { display: none; }
     #prompt {
       flex: 1;
       border: 1px solid #ddd;
       border-radius: 10px;
-      padding: 10px 14px;
+      padding: 9px 13px;
       font-size: 14px;
       font-family: inherit;
       line-height: 1.5;
@@ -96,124 +236,389 @@
       max-height: 160px;
       overflow-y: auto;
     }
-
     #prompt:focus { border-color: #aaa; }
-
-    #send {
+    #stop-btn {
+      background: #fee;
+      color: #c00;
+      border: 1px solid #fcc;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: none;
+    }
+    #stop-btn.visible { display: block; }
+    #send-btn {
       background: #1a1a1a;
       color: #fff;
       border: none;
       border-radius: 10px;
-      padding: 10px 18px;
+      padding: 9px 18px;
       font-size: 14px;
       cursor: pointer;
       flex-shrink: 0;
     }
+    #send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-    #send:disabled { opacity: 0.35; cursor: not-allowed; }
+    /* ── Loading overlay ── */
+    #loading {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      font-size: 14px;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #loading.visible { display: flex; }
+    #loading .box {
+      background: #1a1a1a;
+      padding: 20px 28px;
+      border-radius: 10px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <header>
-    local-llm <span class="model" id="model-label"></span>
-  </header>
-  <div id="messages"></div>
-  <div id="input-area">
-    <textarea id="prompt" rows="1" placeholder="Message… (Enter to send, Shift+Enter for newline)" autofocus></textarea>
-    <button id="send">Send</button>
+
+<header>
+  <span class="logo">local-llm</span>
+  <span class="kind-badge" id="kind-badge">LLM</span>
+  <select id="model-select"></select>
+  <button id="load-btn">Load</button>
+</header>
+
+<div id="toolbar">
+  <button id="new-chat-btn">New chat</button>
+  <button id="system-btn">System prompt</button>
+</div>
+
+<div id="system-panel">
+  <label>System prompt</label>
+  <textarea id="system-input" rows="2" placeholder="You are a helpful assistant…"></textarea>
+  <div class="row">
+    <label>Persona:</label>
+    <select id="persona-select"><option value="">— none —</option></select>
+    <button class="apply-btn" id="apply-system-btn">Apply</button>
+    <span class="status" id="system-status"></span>
   </div>
+</div>
 
-  <script>
-    const messagesEl = document.getElementById('messages');
-    const promptEl   = document.getElementById('prompt');
-    const sendBtn    = document.getElementById('send');
+<div id="messages"></div>
 
-    const messages = [];
-    let streaming = false;
+<div id="input-area">
+  <div id="image-preview">
+    <img id="preview-img" src="" alt="preview">
+    <button id="remove-image-btn" title="Remove image">✕</button>
+  </div>
+  <div class="input-row">
+    <button id="attach-btn" title="Attach image (VLM only)">📎</button>
+    <input type="file" id="file-input" accept="image/*">
+    <textarea id="prompt" rows="1" placeholder="Message… (Enter to send, Shift+Enter for newline)" autofocus></textarea>
+    <button id="stop-btn">Stop</button>
+    <button id="send-btn">Send</button>
+  </div>
+</div>
 
-    fetch('/info')
-      .then(r => r.json())
-      .then(d => {
-        if (d.model) document.getElementById('model-label').textContent = d.model;
-      })
-      .catch(() => {});
+<div id="loading"><div class="box" id="loading-msg">Loading model…</div></div>
 
-    function addBubble(role, text = '') {
-      const el = document.createElement('div');
-      el.className = `msg ${role}`;
-      el.textContent = text;
-      messagesEl.appendChild(el);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      return el;
+<script>
+  // --- State ---
+  let messages = [];
+  let systemPrompt = '';
+  let pendingImage = null;   // base64 data URL
+  let isVlm = false;
+  let streaming = false;
+  let abortController = null;
+
+  // --- Elements ---
+  const messagesEl     = document.getElementById('messages');
+  const promptEl       = document.getElementById('prompt');
+  const sendBtn        = document.getElementById('send-btn');
+  const stopBtn        = document.getElementById('stop-btn');
+  const attachBtn      = document.getElementById('attach-btn');
+  const fileInput      = document.getElementById('file-input');
+  const imagePreview   = document.getElementById('image-preview');
+  const previewImg     = document.getElementById('preview-img');
+  const removeImageBtn = document.getElementById('remove-image-btn');
+  const modelSelect    = document.getElementById('model-select');
+  const loadBtn        = document.getElementById('load-btn');
+  const kindBadge      = document.getElementById('kind-badge');
+  const newChatBtn     = document.getElementById('new-chat-btn');
+  const systemBtn      = document.getElementById('system-btn');
+  const systemPanel    = document.getElementById('system-panel');
+  const systemInput    = document.getElementById('system-input');
+  const personaSelect  = document.getElementById('persona-select');
+  const applySystemBtn = document.getElementById('apply-system-btn');
+  const systemStatus   = document.getElementById('system-status');
+  const loadingEl      = document.getElementById('loading');
+  const loadingMsg     = document.getElementById('loading-msg');
+
+  // --- Init ---
+  async function init() {
+    await Promise.all([loadInfo(), loadModels(), loadPersonas()]);
+  }
+
+  async function loadInfo() {
+    try {
+      const d = await fetch('/info').then(r => r.json());
+      setCurrentModel(d.model, d.kind);
+    } catch {}
+  }
+
+  async function loadModels() {
+    try {
+      const list = await fetch('/models').then(r => r.json());
+      modelSelect.innerHTML = list.length
+        ? list.map(m => `<option value="${m.id}">${m.id} [${m.kind}] ${m.size_gb}GB</option>`).join('')
+        : '<option value="">No models downloaded</option>';
+    } catch {}
+  }
+
+  async function loadPersonas() {
+    try {
+      const list = await fetch('/personas').then(r => r.json());
+      list.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        personaSelect.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  function setCurrentModel(modelId, kind) {
+    if (!modelId) return;
+    isVlm = kind === 'VLM';
+    kindBadge.textContent = kind;
+    kindBadge.className = 'kind-badge' + (isVlm ? ' vlm' : '');
+    attachBtn.disabled = !isVlm;
+    // select the matching option
+    for (const opt of modelSelect.options) {
+      if (opt.value === modelId) { opt.selected = true; break; }
+    }
+  }
+
+  // --- Model loading ---
+  loadBtn.addEventListener('click', async () => {
+    const modelId = modelSelect.value;
+    if (!modelId) return;
+    showLoading(`Loading ${modelId}…`);
+    try {
+      const d = await fetch('/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: modelId }),
+      }).then(r => r.json());
+      setCurrentModel(d.model, d.kind);
+      clearChat();
+    } catch (e) {
+      alert(`Failed to load model: ${e.message}`);
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // --- New chat ---
+  newChatBtn.addEventListener('click', clearChat);
+
+  function clearChat() {
+    messages = [];
+    messagesEl.innerHTML = '';
+    clearImage();
+  }
+
+  // --- System prompt panel ---
+  systemBtn.addEventListener('click', () => {
+    systemPanel.classList.toggle('open');
+    systemBtn.classList.toggle('active');
+  });
+
+  applySystemBtn.addEventListener('click', async () => {
+    const persona = personaSelect.value;
+    if (persona) {
+      try {
+        const res = await fetch(`/personas/${persona}`);
+        if (res.ok) {
+          systemInput.value = await res.text();
+        }
+      } catch {}
+    }
+    systemPrompt = systemInput.value.trim();
+    systemStatus.textContent = systemPrompt ? 'Applied' : 'Cleared';
+    setTimeout(() => { systemStatus.textContent = ''; }, 2000);
+  });
+
+  personaSelect.addEventListener('change', async () => {
+    const name = personaSelect.value;
+    if (!name) return;
+    try {
+      const res = await fetch(`/personas/${name}`);
+      if (res.ok) systemInput.value = await res.text();
+    } catch {}
+  });
+
+  // --- Image attach ---
+  attachBtn.addEventListener('click', () => {
+    if (!isVlm) return;
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      pendingImage = e.target.result;
+      previewImg.src = pendingImage;
+      imagePreview.classList.add('visible');
+      attachBtn.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = '';
+  });
+
+  removeImageBtn.addEventListener('click', clearImage);
+
+  function clearImage() {
+    pendingImage = null;
+    previewImg.src = '';
+    imagePreview.classList.remove('visible');
+    attachBtn.classList.remove('has-image');
+  }
+
+  // --- Send / Stop ---
+  sendBtn.addEventListener('click', send);
+  stopBtn.addEventListener('click', () => { if (abortController) abortController.abort(); });
+
+  promptEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  promptEl.addEventListener('input', () => {
+    promptEl.style.height = 'auto';
+    promptEl.style.height = Math.min(promptEl.scrollHeight, 160) + 'px';
+  });
+
+  async function send() {
+    const text = promptEl.value.trim();
+    if (!text || streaming) return;
+
+    promptEl.value = '';
+    promptEl.style.height = 'auto';
+    streaming = true;
+    sendBtn.disabled = true;
+    stopBtn.classList.add('visible');
+    abortController = new AbortController();
+
+    // Build user bubble
+    const userBubble = document.createElement('div');
+    userBubble.className = 'msg user';
+    if (pendingImage) {
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = pendingImage;
+      userBubble.appendChild(img);
+    }
+    userBubble.appendChild(document.createTextNode(text));
+    messagesEl.appendChild(userBubble);
+    scrollDown();
+
+    // Build message for history
+    const userMsg = { role: 'user', content: text };
+    messages.push(userMsg);
+
+    // Build messages with optional system prompt
+    let outgoing = messages;
+    if (systemPrompt && (!messages[0] || messages[0].role !== 'system')) {
+      outgoing = [{ role: 'system', content: systemPrompt }, ...messages];
     }
 
-    async function send() {
-      const text = promptEl.value.trim();
-      if (!text || streaming) return;
+    const body = { messages: outgoing, stream: true };
+    if (pendingImage) body.image = pendingImage;
+    const imageUsed = pendingImage;
+    clearImage();
 
-      promptEl.value = '';
-      promptEl.style.height = 'auto';
-      streaming = true;
-      sendBtn.disabled = true;
+    const bubble = addBubble('assistant');
+    bubble.classList.add('streaming');
+    let response = '';
 
-      messages.push({ role: 'user', content: text });
-      addBubble('user', text);
+    try {
+      const res = await fetch('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: abortController.signal,
+      });
 
-      const bubble = addBubble('assistant');
-      bubble.classList.add('streaming');
-      let response = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
 
-      try {
-        const res = await fetch('/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages, stream: true }),
-        });
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split('\n');
-          buf = lines.pop();
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const payload = line.slice(6).trim();
-            if (payload === '[DONE]') break;
-            try {
-              const chunk = JSON.parse(payload);
-              const token = chunk.choices?.[0]?.delta?.content ?? '';
-              response += token;
-              bubble.textContent = response;
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            } catch {}
-          }
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') break;
+          try {
+            const chunk = JSON.parse(payload);
+            const token = chunk.choices?.[0]?.delta?.content ?? '';
+            response += token;
+            bubble.textContent = response;
+            scrollDown();
+          } catch {}
         }
-      } catch (e) {
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') {
         bubble.textContent = `Error: ${e.message}`;
       }
-
-      bubble.classList.remove('streaming');
-      messages.push({ role: 'assistant', content: response });
-      streaming = false;
-      sendBtn.disabled = false;
-      promptEl.focus();
     }
 
-    sendBtn.addEventListener('click', send);
+    bubble.classList.remove('streaming');
+    if (response) messages.push({ role: 'assistant', content: response });
+    streaming = false;
+    sendBtn.disabled = false;
+    stopBtn.classList.remove('visible');
+    promptEl.focus();
+  }
 
-    promptEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
+  // --- Helpers ---
+  function addBubble(role, text = '') {
+    const el = document.createElement('div');
+    el.className = `msg ${role}`;
+    el.textContent = text;
+    messagesEl.appendChild(el);
+    scrollDown();
+    return el;
+  }
 
-    promptEl.addEventListener('input', () => {
-      promptEl.style.height = 'auto';
-      promptEl.style.height = Math.min(promptEl.scrollHeight, 160) + 'px';
-    });
-  </script>
+  function scrollDown() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showLoading(msg) {
+    loadingMsg.textContent = msg;
+    loadingEl.classList.add('visible');
+  }
+
+  function hideLoading() {
+    loadingEl.classList.remove('visible');
+  }
+
+  // --- Persona file fetch (served as static by FastAPI) ---
+  // We need a /personas/<name> text endpoint — add it to the fetch above
+  // For now personas are applied via the /personas list + user pastes text
+  // The personaSelect change handler tries GET /personas/<name> which we'll add server-side
+
+  init();
+</script>
 </body>
 </html>
