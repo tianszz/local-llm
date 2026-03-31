@@ -11,6 +11,8 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=cfg["max_tokens"])
     parser.add_argument("--temp", type=float, default=cfg["temp"])
     parser.add_argument("--image", help="Image path (vision models only)")
+    parser.add_argument("--system", help="System prompt for this session")
+    parser.add_argument("--persona", help="Named persona from ~/.local-llm/personas/")
 
     sub = parser.add_subparsers(dest="command")
 
@@ -28,6 +30,8 @@ def main():
 
     args = parser.parse_args()
 
+    system = _resolve_system(args)
+
     if args.command == "pull":
         models.pull(args.model_id)
     elif args.command == "list":
@@ -36,9 +40,18 @@ def main():
         models.remove(args.model_id)
     elif args.command == "serve":
         from src import server
-        server.serve(args.model, args.host, args.port)
+        server.serve(args.model, args.host, args.port, system)
     else:
-        chat.run(args.model, args.max_tokens, args.temp, args.image)
+        chat.run(args.model, args.max_tokens, args.temp, args.image, system)
+
+
+def _resolve_system(args):
+    if args.system and args.persona:
+        raise SystemExit("--system and --persona are mutually exclusive")
+    if args.persona:
+        from src.personas import load
+        return load(args.persona)
+    return args.system
 
 
 if __name__ == "__main__":
