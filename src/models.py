@@ -13,15 +13,23 @@ def pull(model_id):
 
 
 def list_models():
-    dirs = sorted(MODELS_DIR.glob("models--*"))
-    if not dirs:
+    data = list_models_data()
+    if not data:
         print("No models downloaded.")
         return
+    for m in data:
+        print(f"{m['id']}  [{m['kind']}]  {m['size_gb']:.1f} GB")
+
+
+def list_models_data():
+    dirs = sorted(MODELS_DIR.glob("models--*"))
+    result = []
     for d in dirs:
         model_id = _dir_to_model_id(d.name)
         size = _dir_size_gb(d)
         kind = "VLM" if is_vision_model(model_id) else "LLM"
-        print(f"{model_id}  [{kind}]  {size:.1f} GB")
+        result.append({"id": model_id, "size_gb": round(size, 1), "kind": kind})
+    return result
 
 
 def remove(model_id):
