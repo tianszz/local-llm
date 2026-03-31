@@ -2,23 +2,29 @@ import json
 import time
 import uuid
 
+from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI()
 
 _model = None
 _tokenizer = None
 _model_id = None
+_system = None
 
 
-def load_model(model_id):
-    global _model, _tokenizer, _model_id
+def load_model(model_id, system=None):
+    global _model, _tokenizer, _model_id, _system
     from mlx_lm import load
     print(f"Loading {model_id}...")
     _model, _tokenizer = load(model_id)
     _model_id = model_id
+    _system = system
     print("Server ready.")
 
 
@@ -28,6 +34,12 @@ def _stream_tokens(prompt_text, max_tokens, temp):
     sampler = make_sampler(temp=temp)
     for chunk in stream_generate(_model, _tokenizer, prompt=prompt_text, max_tokens=max_tokens, sampler=sampler):
         yield chunk.text
+
+
+def _prepend_system(messages):
+    if _system and (not messages or messages[0].get("role") != "system"):
+        return [{"role": "system", "content": _system}] + messages
+    return messages
 
 
 # --- Request models ---
@@ -54,6 +66,16 @@ class OpenAIRequest(BaseModel):
 
 # --- Endpoints ---
 
+@app.get("/")
+def index():
+    return FileResponse(STATIC_DIR / "chat.html")
+
+
+@app.get("/info")
+def info():
+    return {"model": _model_id}
+
+
 @app.post("/generate")
 def generate(req: GenerateRequest):
     def event_stream():
@@ -65,8 +87,9 @@ def generate(req: GenerateRequest):
 
 @app.post("/chat")
 def chat(req: ChatRequest):
+    messages = _prepend_system(req.messages)
     text = _tokenizer.apply_chat_template(
-        req.messages, tokenize=False, add_generation_prompt=True
+        messages, tokenize=False, add_generation_prompt=True
     )
     def event_stream():
         for token in _stream_tokens(text, req.max_tokens, req.temp):
@@ -82,8 +105,9 @@ def openai_chat(req: OpenAIRequest):
     max_tokens = req.max_tokens or cfg["max_tokens"]
     temp = req.temperature if req.temperature is not None else cfg["temp"]
 
+    messages = _prepend_system(req.messages)
     text = _tokenizer.apply_chat_template(
-        req.messages, tokenize=False, add_generation_prompt=True
+        messages, tokenize=False, add_generation_prompt=True
     )
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
@@ -122,7 +146,7 @@ def openai_chat(req: OpenAIRequest):
     }
 
 
-def serve(model_id, host, port):
+def serve(model_id, host, port, system=None):
     import uvicorn
-    load_model(model_id)
+    load_model(model_id, system)
     uvicorn.run(app, host=host, port=port)
