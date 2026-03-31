@@ -22,6 +22,10 @@ def main():
     remove_p = sub.add_parser("remove", help="Delete a local model")
     remove_p.add_argument("model_id")
 
+    serve_p = sub.add_parser("serve", help="Start the HTTP API server")
+    serve_p.add_argument("--host", default="127.0.0.1")
+    serve_p.add_argument("--port", type=int, default=8080)
+
     args = parser.parse_args()
 
     if args.command == "pull":
@@ -30,6 +34,9 @@ def main():
         models.list_models()
     elif args.command == "remove":
         models.remove(args.model_id)
+    elif args.command == "serve":
+        from src import server
+        server.serve(args.model, args.host, args.port)
     else:
         chat.run(args.model, args.max_tokens, args.temp, args.image)
 
