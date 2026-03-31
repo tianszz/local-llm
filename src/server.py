@@ -2,9 +2,13 @@ import json
 import time
 import uuid
 
+from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI()
 
@@ -61,6 +65,16 @@ class OpenAIRequest(BaseModel):
 
 
 # --- Endpoints ---
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC_DIR / "chat.html")
+
+
+@app.get("/info")
+def info():
+    return {"model": _model_id}
+
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
