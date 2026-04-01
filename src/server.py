@@ -140,6 +140,10 @@ class PullRequest(BaseModel):
     model_id: str
 
 
+class TokenRequest(BaseModel):
+    token: str
+
+
 class GenerateRequest(BaseModel):
     prompt: str
     max_tokens: int = 512
@@ -186,9 +190,24 @@ def load(req: LoadRequest):
     return {"model": _model_id, "kind": "VLM" if _is_vlm else "LLM"}
 
 
+@app.get("/hf-status")
+def hf_status():
+    from src.models import hf_token_set
+    return {"authenticated": hf_token_set()}
+
+
+@app.post("/hf-token")
+def set_hf_token(req: TokenRequest):
+    from src.models import save_hf_token, hf_token_set
+    save_hf_token(req.token)
+    return {"authenticated": hf_token_set()}
+
+
 @app.post("/pull")
 def pull(req: PullRequest):
-    from src.models import pull as pull_model, list_models_data
+    from src.models import pull as pull_model, list_models_data, hf_token_set
+    if not hf_token_set():
+        raise HTTPException(status_code=401, detail="HuggingFace token not set")
     pull_model(req.model_id)
     return {"model_id": req.model_id, "models": list_models_data()}
 

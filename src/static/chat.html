@@ -70,11 +70,31 @@
       border-bottom: 1px solid #333;
       padding: 10px 16px;
       display: none;
-      align-items: center;
+      flex-direction: column;
       gap: 8px;
       flex-shrink: 0;
     }
     #pull-panel.open { display: flex; }
+    #pull-token-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    #pull-token-row.visible { display: flex; }
+    #pull-token-row label { font-size: 11px; color: #f80; white-space: nowrap; }
+    #pull-token-input {
+      flex: 1;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #f80;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    #pull-token-input::placeholder { color: #666; }
+    #pull-model-row { display: flex; align-items: center; gap: 8px; }
     #pull-input {
       flex: 1;
       background: #2a2a2a;
@@ -340,8 +360,15 @@
 </header>
 
 <div id="pull-panel">
-  <input id="pull-input" type="text" placeholder="mlx-community/model-name-4bit" spellcheck="false">
-  <button id="pull-btn">Download</button>
+  <div id="pull-token-row">
+    <label>⚠ HF token required:</label>
+    <input id="pull-token-input" type="password" placeholder="hf_…" spellcheck="false">
+    <button id="save-token-btn">Save</button>
+  </div>
+  <div id="pull-model-row">
+    <input id="pull-input" type="text" placeholder="mlx-community/model-name-4bit" spellcheck="false">
+    <button id="pull-btn">Download</button>
+  </div>
   <span id="pull-status"></span>
 </div>
 
@@ -414,6 +441,9 @@
   const systemStatus   = document.getElementById('system-status');
   const pullToggleBtn  = document.getElementById('pull-toggle-btn');
   const pullPanel      = document.getElementById('pull-panel');
+  const pullTokenRow   = document.getElementById('pull-token-row');
+  const pullTokenInput = document.getElementById('pull-token-input');
+  const saveTokenBtn   = document.getElementById('save-token-btn');
   const pullInput      = document.getElementById('pull-input');
   const pullBtn        = document.getElementById('pull-btn');
   const pullStatus     = document.getElementById('pull-status');
@@ -487,10 +517,49 @@
   });
 
   // --- Pull new model ---
-  pullToggleBtn.addEventListener('click', () => {
-    pullPanel.classList.toggle('open');
-    pullInput.focus();
+  pullToggleBtn.addEventListener('click', async () => {
+    const isOpen = pullPanel.classList.toggle('open');
+    if (isOpen) {
+      await checkHfAuth();
+      pullInput.focus();
+    }
   });
+
+  async function checkHfAuth() {
+    try {
+      const res = await fetch('/hf-status').then(r => r.json());
+      pullTokenRow.classList.toggle('visible', !res.authenticated);
+      pullBtn.disabled = !res.authenticated;
+    } catch {}
+  }
+
+  saveTokenBtn.addEventListener('click', saveToken);
+  pullTokenInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
+
+  async function saveToken() {
+    const token = pullTokenInput.value.trim();
+    if (!token) return;
+    saveTokenBtn.disabled = true;
+    try {
+      const res = await fetch('/hf-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      }).then(r => r.json());
+      if (res.authenticated) {
+        pullTokenRow.classList.remove('visible');
+        pullTokenInput.value = '';
+        pullBtn.disabled = false;
+        pullStatus.textContent = 'Token saved ✓';
+        setTimeout(() => { pullStatus.textContent = ''; }, 2000);
+        pullInput.focus();
+      }
+    } catch (e) {
+      pullStatus.textContent = `Error: ${e.message}`;
+    } finally {
+      saveTokenBtn.disabled = false;
+    }
+  }
 
   pullBtn.addEventListener('click', pullModel);
   pullInput.addEventListener('keydown', e => { if (e.key === 'Enter') pullModel(); });
@@ -506,16 +575,19 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_id: modelId }),
       });
+      if (res.status === 401) {
+        pullTokenRow.classList.add('visible');
+        pullStatus.textContent = 'Token required — enter it above.';
+        return;
+      }
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       pullStatus.textContent = 'Done!';
       pullInput.value = '';
-      // Refresh model list and select the new model
       const list = data.models;
       modelSelect.innerHTML = list.map(m =>
         `<option value="${m.id}">${m.id}  [${m.kind}  ${m.size_gb}GB]</option>`
       ).join('');
-      // Select the just-pulled model
       for (const opt of modelSelect.options) {
         if (opt.value === modelId) { opt.selected = true; break; }
       }
