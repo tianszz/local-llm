@@ -74,12 +74,13 @@ def _stream_llm(prompt_text, max_tokens, temp):
 
 def _stream_vlm(prompt_text, image_b64, max_tokens, temp):
     from mlx_vlm import stream_generate
-    raw = image_b64.split(",", 1)[-1] if "," in image_b64 else image_b64
-    img_bytes = base64.b64decode(raw)
-    suffix = ".jpg"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(img_bytes)
-        img_path = f.name
+    img_path = None
+    if image_b64:
+        raw = image_b64.split(",", 1)[-1] if "," in image_b64 else image_b64
+        img_bytes = base64.b64decode(raw)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(img_bytes)
+            img_path = f.name
     try:
         for chunk in stream_generate(
             _model, _processor, prompt_text,
@@ -87,7 +88,8 @@ def _stream_vlm(prompt_text, image_b64, max_tokens, temp):
         ):
             yield chunk.text
     finally:
-        os.unlink(img_path)
+        if img_path:
+            os.unlink(img_path)
 
 
 def _prepend_system(messages):
@@ -106,7 +108,7 @@ def _apply_chat_template(messages, image_b64=None):
 
 
 def _stream_response(prompt_text, image_b64, max_tokens, temp):
-    if _is_vlm and image_b64:
+    if _is_vlm:
         return _stream_vlm(prompt_text, image_b64, max_tokens, temp)
     return _stream_llm(prompt_text, max_tokens, temp)
 
