@@ -26,18 +26,20 @@
       gap: 10px;
       flex-shrink: 0;
     }
-    header .logo { font-size: 14px; font-weight: 600; white-space: nowrap; }
-    header .kind-badge {
+    .logo { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .kind-badge {
       font-size: 10px;
       padding: 2px 6px;
       border-radius: 4px;
       background: #333;
       color: #aaa;
       font-family: monospace;
+      white-space: nowrap;
     }
-    header .kind-badge.vlm { background: #1a3a1a; color: #6f6; }
+    .kind-badge.vlm { background: #1a3a1a; color: #6f6; }
     header select {
       flex: 1;
+      min-width: 0;
       background: #2a2a2a;
       color: #fff;
       border: 1px solid #444;
@@ -46,20 +48,58 @@
       font-size: 12px;
       font-family: monospace;
       outline: none;
-      min-width: 0;
+      cursor: pointer;
     }
     header select option { background: #1a1a1a; }
-    header button {
-      background: #fff;
-      color: #1a1a1a;
-      border: none;
+    header select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .header-btn {
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
       border-radius: 6px;
-      padding: 5px 12px;
+      padding: 5px 10px;
       font-size: 12px;
       cursor: pointer;
       white-space: nowrap;
     }
-    header button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .header-btn:hover { background: #333; }
+
+    /* ── Pull panel ── */
+    #pull-panel {
+      background: #111;
+      border-bottom: 1px solid #333;
+      padding: 10px 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #pull-panel.open { display: flex; }
+    #pull-input {
+      flex: 1;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    #pull-input::placeholder { color: #666; }
+    #pull-input:focus { border-color: #666; }
+    #pull-btn {
+      background: #fff;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #pull-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #pull-status { font-size: 11px; color: #888; white-space: nowrap; }
 
     /* ── Toolbar ── */
     #toolbar {
@@ -105,8 +145,8 @@
       outline: none;
     }
     #system-panel textarea:focus { border-color: #aaa; }
-    #system-panel .row { display: flex; gap: 8px; align-items: center; }
-    #system-panel select {
+    .system-row { display: flex; gap: 8px; align-items: center; }
+    #persona-select {
       border: 1px solid #ddd;
       border-radius: 6px;
       padding: 5px 8px;
@@ -114,7 +154,7 @@
       outline: none;
       background: #fff;
     }
-    #system-panel .apply-btn {
+    .apply-btn {
       background: #1a1a1a;
       color: #fff;
       border: none;
@@ -123,7 +163,7 @@
       font-size: 12px;
       cursor: pointer;
     }
-    #system-panel .status { font-size: 11px; color: #4caf50; }
+    #system-status { font-size: 11px; color: #4caf50; }
 
     /* ── Messages ── */
     #messages {
@@ -169,6 +209,13 @@
       animation: blink 0.8s step-end infinite;
     }
     @keyframes blink { 50% { opacity: 0; } }
+    .stats-line {
+      align-self: flex-start;
+      font-size: 11px;
+      color: #aaa;
+      padding: 0 4px;
+      margin-top: -8px;
+    }
 
     /* ── Input area ── */
     #input-area {
@@ -199,7 +246,6 @@
       color: #999;
       cursor: pointer;
       font-size: 16px;
-      line-height: 1;
     }
     .input-row {
       display: flex;
@@ -274,12 +320,14 @@
       z-index: 100;
     }
     #loading.visible { display: flex; }
-    #loading .box {
+    .loading-box {
       background: #1a1a1a;
       padding: 20px 28px;
       border-radius: 10px;
       text-align: center;
+      line-height: 1.6;
     }
+    .loading-box small { display: block; color: #888; font-size: 11px; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -288,8 +336,14 @@
   <span class="logo">local-llm</span>
   <span class="kind-badge" id="kind-badge">LLM</span>
   <select id="model-select"></select>
-  <button id="load-btn">Load</button>
+  <button class="header-btn" id="pull-toggle-btn" title="Download a new model">⬇ Pull</button>
 </header>
+
+<div id="pull-panel">
+  <input id="pull-input" type="text" placeholder="mlx-community/model-name-4bit" spellcheck="false">
+  <button id="pull-btn">Download</button>
+  <span id="pull-status"></span>
+</div>
 
 <div id="toolbar">
   <button id="new-chat-btn">New chat</button>
@@ -299,11 +353,11 @@
 <div id="system-panel">
   <label>System prompt</label>
   <textarea id="system-input" rows="2" placeholder="You are a helpful assistant…"></textarea>
-  <div class="row">
+  <div class="system-row">
     <label>Persona:</label>
     <select id="persona-select"><option value="">— none —</option></select>
     <button class="apply-btn" id="apply-system-btn">Apply</button>
-    <span class="status" id="system-status"></span>
+    <span id="system-status"></span>
   </div>
 </div>
 
@@ -323,13 +377,18 @@
   </div>
 </div>
 
-<div id="loading"><div class="box" id="loading-msg">Loading model…</div></div>
+<div id="loading">
+  <div class="loading-box">
+    <div id="loading-msg">Loading…</div>
+    <small id="loading-sub"></small>
+  </div>
+</div>
 
 <script>
   // --- State ---
-  let messages = [];
+  let messages   = [];
   let systemPrompt = '';
-  let pendingImage = null;   // base64 data URL
+  let pendingImage = null;
   let isVlm = false;
   let streaming = false;
   let abortController = null;
@@ -345,7 +404,6 @@
   const previewImg     = document.getElementById('preview-img');
   const removeImageBtn = document.getElementById('remove-image-btn');
   const modelSelect    = document.getElementById('model-select');
-  const loadBtn        = document.getElementById('load-btn');
   const kindBadge      = document.getElementById('kind-badge');
   const newChatBtn     = document.getElementById('new-chat-btn');
   const systemBtn      = document.getElementById('system-btn');
@@ -354,8 +412,14 @@
   const personaSelect  = document.getElementById('persona-select');
   const applySystemBtn = document.getElementById('apply-system-btn');
   const systemStatus   = document.getElementById('system-status');
+  const pullToggleBtn  = document.getElementById('pull-toggle-btn');
+  const pullPanel      = document.getElementById('pull-panel');
+  const pullInput      = document.getElementById('pull-input');
+  const pullBtn        = document.getElementById('pull-btn');
+  const pullStatus     = document.getElementById('pull-status');
   const loadingEl      = document.getElementById('loading');
   const loadingMsg     = document.getElementById('loading-msg');
+  const loadingSub     = document.getElementById('loading-sub');
 
   // --- Init ---
   async function init() {
@@ -365,7 +429,7 @@
   async function loadInfo() {
     try {
       const d = await fetch('/info').then(r => r.json());
-      setCurrentModel(d.model, d.kind);
+      setActiveModel(d.model, d.kind);
     } catch {}
   }
 
@@ -373,7 +437,7 @@
     try {
       const list = await fetch('/models').then(r => r.json());
       modelSelect.innerHTML = list.length
-        ? list.map(m => `<option value="${m.id}">${m.id} [${m.kind}] ${m.size_gb}GB</option>`).join('')
+        ? list.map(m => `<option value="${m.id}">${m.id}  [${m.kind}  ${m.size_gb}GB]</option>`).join('')
         : '<option value="">No models downloaded</option>';
     } catch {}
   }
@@ -383,44 +447,85 @@
       const list = await fetch('/personas').then(r => r.json());
       list.forEach(name => {
         const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
+        opt.value = name; opt.textContent = name;
         personaSelect.appendChild(opt);
       });
     } catch {}
   }
 
-  function setCurrentModel(modelId, kind) {
+  function setActiveModel(modelId, kind) {
     if (!modelId) return;
     isVlm = kind === 'VLM';
     kindBadge.textContent = kind;
     kindBadge.className = 'kind-badge' + (isVlm ? ' vlm' : '');
     attachBtn.disabled = !isVlm;
-    // select the matching option
     for (const opt of modelSelect.options) {
       if (opt.value === modelId) { opt.selected = true; break; }
     }
   }
 
-  // --- Model loading ---
-  loadBtn.addEventListener('click', async () => {
+  // --- Auto-load on model select change ---
+  modelSelect.addEventListener('change', async () => {
     const modelId = modelSelect.value;
     if (!modelId) return;
     showLoading(`Loading ${modelId}…`);
+    modelSelect.disabled = true;
     try {
       const d = await fetch('/load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_id: modelId }),
       }).then(r => r.json());
-      setCurrentModel(d.model, d.kind);
+      setActiveModel(d.model, d.kind);
       clearChat();
     } catch (e) {
       alert(`Failed to load model: ${e.message}`);
     } finally {
+      modelSelect.disabled = false;
       hideLoading();
     }
   });
+
+  // --- Pull new model ---
+  pullToggleBtn.addEventListener('click', () => {
+    pullPanel.classList.toggle('open');
+    pullInput.focus();
+  });
+
+  pullBtn.addEventListener('click', pullModel);
+  pullInput.addEventListener('keydown', e => { if (e.key === 'Enter') pullModel(); });
+
+  async function pullModel() {
+    const modelId = pullInput.value.trim();
+    if (!modelId) return;
+    pullBtn.disabled = true;
+    pullStatus.textContent = 'Downloading… (this may take a few minutes)';
+    try {
+      const res = await fetch('/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: modelId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      pullStatus.textContent = 'Done!';
+      pullInput.value = '';
+      // Refresh model list and select the new model
+      const list = data.models;
+      modelSelect.innerHTML = list.map(m =>
+        `<option value="${m.id}">${m.id}  [${m.kind}  ${m.size_gb}GB]</option>`
+      ).join('');
+      // Select the just-pulled model
+      for (const opt of modelSelect.options) {
+        if (opt.value === modelId) { opt.selected = true; break; }
+      }
+      setTimeout(() => { pullStatus.textContent = ''; pullPanel.classList.remove('open'); }, 2000);
+    } catch (e) {
+      pullStatus.textContent = `Error: ${e.message}`;
+    } finally {
+      pullBtn.disabled = false;
+    }
+  }
 
   // --- New chat ---
   newChatBtn.addEventListener('click', clearChat);
@@ -431,24 +536,15 @@
     clearImage();
   }
 
-  // --- System prompt panel ---
+  // --- System prompt ---
   systemBtn.addEventListener('click', () => {
     systemPanel.classList.toggle('open');
     systemBtn.classList.toggle('active');
   });
 
-  applySystemBtn.addEventListener('click', async () => {
-    const persona = personaSelect.value;
-    if (persona) {
-      try {
-        const res = await fetch(`/personas/${persona}`);
-        if (res.ok) {
-          systemInput.value = await res.text();
-        }
-      } catch {}
-    }
+  applySystemBtn.addEventListener('click', () => {
     systemPrompt = systemInput.value.trim();
-    systemStatus.textContent = systemPrompt ? 'Applied' : 'Cleared';
+    systemStatus.textContent = systemPrompt ? 'Applied ✓' : 'Cleared';
     setTimeout(() => { systemStatus.textContent = ''; }, 2000);
   });
 
@@ -462,10 +558,7 @@
   });
 
   // --- Image attach ---
-  attachBtn.addEventListener('click', () => {
-    if (!isVlm) return;
-    fileInput.click();
-  });
+  attachBtn.addEventListener('click', () => { if (isVlm) fileInput.click(); });
 
   fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
@@ -513,7 +606,7 @@
     stopBtn.classList.add('visible');
     abortController = new AbortController();
 
-    // Build user bubble
+    // User bubble
     const userBubble = document.createElement('div');
     userBubble.className = 'msg user';
     if (pendingImage) {
@@ -526,11 +619,8 @@
     messagesEl.appendChild(userBubble);
     scrollDown();
 
-    // Build message for history
-    const userMsg = { role: 'user', content: text };
-    messages.push(userMsg);
+    messages.push({ role: 'user', content: text });
 
-    // Build messages with optional system prompt
     let outgoing = messages;
     if (systemPrompt && (!messages[0] || messages[0].role !== 'system')) {
       outgoing = [{ role: 'system', content: systemPrompt }, ...messages];
@@ -538,12 +628,12 @@
 
     const body = { messages: outgoing, stream: true };
     if (pendingImage) body.image = pendingImage;
-    const imageUsed = pendingImage;
     clearImage();
 
     const bubble = addBubble('assistant');
     bubble.classList.add('streaming');
     let response = '';
+    let stats = null;
 
     try {
       const res = await fetch('/v1/chat/completions', {
@@ -569,6 +659,7 @@
           if (payload === '[DONE]') break;
           try {
             const chunk = JSON.parse(payload);
+            if (chunk.stats) { stats = chunk.stats; continue; }
             const token = chunk.choices?.[0]?.delta?.content ?? '';
             response += token;
             bubble.textContent = response;
@@ -577,16 +668,24 @@
         }
       }
     } catch (e) {
-      if (e.name !== 'AbortError') {
-        bubble.textContent = `Error: ${e.message}`;
-      }
+      if (e.name !== 'AbortError') bubble.textContent = `Error: ${e.message}`;
     }
 
     bubble.classList.remove('streaming');
+
+    // Stats line
+    if (stats) {
+      const sl = document.createElement('div');
+      sl.className = 'stats-line';
+      sl.textContent = `${stats.tps} tok/s · ${stats.generation_tokens} tokens`;
+      messagesEl.appendChild(sl);
+    }
+
     if (response) messages.push({ role: 'assistant', content: response });
     streaming = false;
     sendBtn.disabled = false;
     stopBtn.classList.remove('visible');
+    scrollDown();
     promptEl.focus();
   }
 
@@ -600,23 +699,15 @@
     return el;
   }
 
-  function scrollDown() {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+  function scrollDown() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
-  function showLoading(msg) {
+  function showLoading(msg, sub = '') {
     loadingMsg.textContent = msg;
+    loadingSub.textContent = sub;
     loadingEl.classList.add('visible');
   }
 
-  function hideLoading() {
-    loadingEl.classList.remove('visible');
-  }
-
-  // --- Persona file fetch (served as static by FastAPI) ---
-  // We need a /personas/<name> text endpoint — add it to the fetch above
-  // For now personas are applied via the /personas list + user pastes text
-  // The personaSelect change handler tries GET /personas/<name> which we'll add server-side
+  function hideLoading() { loadingEl.classList.remove('visible'); }
 
   init();
 </script>
