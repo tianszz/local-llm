@@ -63,13 +63,22 @@ def load_model(model_id, system=None):
 
 
 # --- Inference helpers ---
+# Each generator yields token strings, then a final stats dict.
 
 def _stream_llm(prompt_text, max_tokens, temp):
     from mlx_lm import stream_generate
     from mlx_lm.sample_utils import make_sampler
     sampler = make_sampler(temp=temp)
+    last = None
     for chunk in stream_generate(_model, _tokenizer, prompt=prompt_text, max_tokens=max_tokens, sampler=sampler):
         yield chunk.text
+        last = chunk
+    if last:
+        yield {
+            "prompt_tokens": last.prompt_tokens,
+            "generation_tokens": last.generation_tokens,
+            "tps": round(last.generation_tps, 1),
+        }
 
 
 def _stream_vlm(prompt_text, image_b64, max_tokens, temp):
@@ -82,11 +91,19 @@ def _stream_vlm(prompt_text, image_b64, max_tokens, temp):
             f.write(img_bytes)
             img_path = f.name
     try:
+        last = None
         for chunk in stream_generate(
             _model, _processor, prompt_text,
             image=img_path, max_tokens=max_tokens, temperature=temp
         ):
             yield chunk.text
+            last = chunk
+        if last:
+            yield {
+                "prompt_tokens": getattr(last, "prompt_tokens", 0),
+                "generation_tokens": getattr(last, "generation_tokens", 0),
+                "tps": round(getattr(last, "generation_tps", 0.0), 1),
+            }
     finally:
         if img_path:
             os.unlink(img_path)
@@ -119,6 +136,14 @@ class LoadRequest(BaseModel):
     model_id: str
 
 
+class PullRequest(BaseModel):
+    model_id: str
+
+
+class TokenRequest(BaseModel):
+    token: str
+
+
 class GenerateRequest(BaseModel):
     prompt: str
     max_tokens: int = 512
@@ -127,7 +152,7 @@ class GenerateRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list
-    image: str = None   # base64 data URL, VLM only
+    image: str = None
     max_tokens: int = 512
     temp: float = 0.7
 
@@ -135,7 +160,7 @@ class ChatRequest(BaseModel):
 class OpenAIRequest(BaseModel):
     model: str = None
     messages: list
-    image: str = None   # base64 data URL, VLM only
+    image: str = None
     max_tokens: int = None
     temperature: float = None
     stream: bool = False
@@ -159,6 +184,34 @@ def models():
     return list_models_data()
 
 
+@app.post("/load")
+def load(req: LoadRequest):
+    load_model(req.model_id, _system)
+    return {"model": _model_id, "kind": "VLM" if _is_vlm else "LLM"}
+
+
+@app.get("/hf-status")
+def hf_status():
+    from src.models import hf_token_set
+    return {"authenticated": hf_token_set()}
+
+
+@app.post("/hf-token")
+def set_hf_token(req: TokenRequest):
+    from src.models import save_hf_token, hf_token_set
+    save_hf_token(req.token)
+    return {"authenticated": hf_token_set()}
+
+
+@app.post("/pull")
+def pull(req: PullRequest):
+    from src.models import pull as pull_model, list_models_data, hf_token_set
+    if not hf_token_set():
+        raise HTTPException(status_code=401, detail="HuggingFace token not set")
+    pull_model(req.model_id)
+    return {"model_id": req.model_id, "models": list_models_data()}
+
+
 @app.get("/personas")
 def personas():
     from src.personas import PERSONAS_DIR
@@ -177,19 +230,14 @@ def persona_text(name: str):
     return PlainTextResponse(path.read_text())
 
 
-@app.post("/load")
-def load(req: LoadRequest):
-    if _model_id is None:
-        raise HTTPException(status_code=503, detail="Server not initialised")
-    load_model(req.model_id, _system)
-    return {"model": _model_id, "kind": "VLM" if _is_vlm else "LLM"}
-
-
 @app.post("/generate")
 def generate(req: GenerateRequest):
     def event_stream():
-        for token in _stream_llm(req.prompt, req.max_tokens, req.temp):
-            yield f"data: {json.dumps({'text': token})}\n\n"
+        for item in _stream_llm(req.prompt, req.max_tokens, req.temp):
+            if isinstance(item, dict):
+                yield f"data: {json.dumps({'type': 'stats', **item})}\n\n"
+            else:
+                yield f"data: {json.dumps({'text': item})}\n\n"
         yield "data: [DONE]\n\n"
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -199,8 +247,11 @@ def chat(req: ChatRequest):
     messages = _prepend_system(req.messages)
     prompt_text = _apply_chat_template(messages, req.image)
     def event_stream():
-        for token in _stream_response(prompt_text, req.image, req.max_tokens, req.temp):
-            yield f"data: {json.dumps({'text': token})}\n\n"
+        for item in _stream_response(prompt_text, req.image, req.max_tokens, req.temp):
+            if isinstance(item, dict):
+                yield f"data: {json.dumps({'type': 'stats', **item})}\n\n"
+            else:
+                yield f"data: {json.dumps({'text': item})}\n\n"
         yield "data: [DONE]\n\n"
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -221,13 +272,17 @@ def openai_chat(req: OpenAIRequest):
 
     if req.stream:
         def event_stream():
-            for token in _stream_response(prompt_text, req.image, max_tokens, temp):
+            stats = None
+            for item in _stream_response(prompt_text, req.image, max_tokens, temp):
+                if isinstance(item, dict):
+                    stats = item
+                    continue
                 chunk = {
                     "id": completion_id,
                     "object": "chat.completion.chunk",
                     "created": created,
                     "model": model_name,
-                    "choices": [{"index": 0, "delta": {"content": token}, "finish_reason": None}],
+                    "choices": [{"index": 0, "delta": {"content": item}, "finish_reason": None}],
                 }
                 yield f"data: {json.dumps(chunk)}\n\n"
             done_chunk = {
@@ -237,18 +292,30 @@ def openai_chat(req: OpenAIRequest):
                 "model": model_name,
                 "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
             }
+            if stats:
+                done_chunk["stats"] = stats
             yield f"data: {json.dumps(done_chunk)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 
-    response = "".join(_stream_response(prompt_text, req.image, max_tokens, temp))
-    return {
+    stats = None
+    tokens = []
+    for item in _stream_response(prompt_text, req.image, max_tokens, temp):
+        if isinstance(item, dict):
+            stats = item
+        else:
+            tokens.append(item)
+    response = "".join(tokens)
+    result = {
         "id": completion_id,
         "object": "chat.completion",
         "created": created,
         "model": model_name,
         "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
+    if stats:
+        result["stats"] = stats
+    return result
 
 
 def serve(model_id, host, port, system=None):

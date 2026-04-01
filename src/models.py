@@ -6,10 +6,26 @@ from huggingface_hub import snapshot_download
 from src.config import MODELS_DIR
 
 
+def hf_token_set():
+    from huggingface_hub import get_token
+    return get_token() is not None
+
+
+def save_hf_token(token):
+    from huggingface_hub import login
+    login(token=token, add_to_git_credential=False)
+
+
 def pull(model_id):
+    if not hf_token_set():
+        print("HuggingFace token not found.")
+        token = input("Enter your HF token (huggingface.co/settings/tokens): ").strip()
+        if not token:
+            raise SystemExit("Token required to download models.")
+        save_hf_token(token)
     print(f"Pulling {model_id}...")
     snapshot_download(repo_id=model_id)
-    print(f"Done.")
+    print("Done.")
 
 
 def list_models():
