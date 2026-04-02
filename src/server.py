@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import gc
 import json
@@ -11,11 +12,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+from src import monitor
+
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI()
 
-# --- Global model state ---
+# --- Global state ---
+
+_last_tps = None
+
+# --- Model state ---
 
 _model      = None
 _tokenizer  = None   # LLM only
@@ -230,11 +237,24 @@ def persona_text(name: str):
     return PlainTextResponse(path.read_text())
 
 
+@app.get("/metrics")
+async def metrics():
+    async def event_stream():
+        while True:
+            stats = monitor.get_stats()
+            stats["tps"] = _last_tps
+            yield f"data: {json.dumps(stats)}\n\n"
+            await asyncio.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/generate")
 def generate(req: GenerateRequest):
     def event_stream():
+        global _last_tps
         for item in _stream_llm(req.prompt, req.max_tokens, req.temp):
             if isinstance(item, dict):
+                _last_tps = item.get("tps")
                 yield f"data: {json.dumps({'type': 'stats', **item})}\n\n"
             else:
                 yield f"data: {json.dumps({'text': item})}\n\n"
@@ -247,8 +267,10 @@ def chat(req: ChatRequest):
     messages = _prepend_system(req.messages)
     prompt_text = _apply_chat_template(messages, req.image)
     def event_stream():
+        global _last_tps
         for item in _stream_response(prompt_text, req.image, req.max_tokens, req.temp):
             if isinstance(item, dict):
+                _last_tps = item.get("tps")
                 yield f"data: {json.dumps({'type': 'stats', **item})}\n\n"
             else:
                 yield f"data: {json.dumps({'text': item})}\n\n"
@@ -272,10 +294,12 @@ def openai_chat(req: OpenAIRequest):
 
     if req.stream:
         def event_stream():
+            global _last_tps
             stats = None
             for item in _stream_response(prompt_text, req.image, max_tokens, temp):
                 if isinstance(item, dict):
                     stats = item
+                    _last_tps = item.get("tps")
                     continue
                 chunk = {
                     "id": completion_id,
@@ -321,4 +345,8 @@ def openai_chat(req: OpenAIRequest):
 def serve(model_id, host, port, system=None):
     import uvicorn
     load_model(model_id, system)
-    uvicorn.run(app, host=host, port=port)
+    monitor.start()
+    try:
+        uvicorn.run(app, host=host, port=port)
+    finally:
+        monitor.stop()
