@@ -142,6 +142,52 @@
     #toolbar button:hover { background: #f5f5f5; }
     #toolbar button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
+    /* ── Metrics bar ── */
+    #metrics-bar {
+      background: #111;
+      border-bottom: 1px solid #222;
+      padding: 5px 16px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-shrink: 0;
+      font-size: 11px;
+      font-family: monospace;
+      color: #666;
+      user-select: none;
+    }
+    .metric-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-label {
+      color: #444;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-val { color: #aaa; }
+    .metric-sub { color: #555; font-size: 10px; }
+    .metric-bar-wrap {
+      width: 40px;
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s ease;
+    }
+    .fill-gpu { background: #4a9eff; }
+    .fill-cpu { background: #4ecb71; }
+    .fill-ram { background: #f0a040; }
+    .metric-sep {
+      color: #2a2a2a;
+    }
+
     /* ── System panel ── */
     #system-panel {
       background: #fafafa;
@@ -372,6 +418,33 @@
   <span id="pull-status"></span>
 </div>
 
+<div id="metrics-bar">
+  <div class="metric-group">
+    <span class="metric-label">GPU</span>
+    <div class="metric-bar-wrap"><div class="metric-bar-fill fill-gpu" id="gpu-bar" style="width:0%"></div></div>
+    <span class="metric-val" id="gpu-util">—</span>
+    <span class="metric-sub" id="gpu-w"></span>
+  </div>
+  <span class="metric-sep">|</span>
+  <div class="metric-group">
+    <span class="metric-label">CPU</span>
+    <div class="metric-bar-wrap"><div class="metric-bar-fill fill-cpu" id="cpu-bar" style="width:0%"></div></div>
+    <span class="metric-val" id="cpu-util">—</span>
+    <span class="metric-sub" id="cpu-w"></span>
+  </div>
+  <span class="metric-sep">|</span>
+  <div class="metric-group">
+    <span class="metric-label">RAM</span>
+    <div class="metric-bar-wrap"><div class="metric-bar-fill fill-ram" id="ram-bar" style="width:0%"></div></div>
+    <span class="metric-val" id="ram-val">—</span>
+  </div>
+  <span class="metric-sep">|</span>
+  <div class="metric-group">
+    <span class="metric-label">tok/s</span>
+    <span class="metric-val" id="tps-val">—</span>
+  </div>
+</div>
+
 <div id="toolbar">
   <button id="new-chat-btn">New chat</button>
   <button id="system-btn">System prompt</button>
@@ -451,9 +524,52 @@
   const loadingMsg     = document.getElementById('loading-msg');
   const loadingSub     = document.getElementById('loading-sub');
 
+  // --- Metrics ---
+  const gpuUtilEl = document.getElementById('gpu-util');
+  const gpuBarEl  = document.getElementById('gpu-bar');
+  const gpuWEl    = document.getElementById('gpu-w');
+  const cpuUtilEl = document.getElementById('cpu-util');
+  const cpuBarEl  = document.getElementById('cpu-bar');
+  const cpuWEl    = document.getElementById('cpu-w');
+  const ramValEl  = document.getElementById('ram-val');
+  const ramBarEl  = document.getElementById('ram-bar');
+  const tpsValEl  = document.getElementById('tps-val');
+
+  function startMetrics() {
+    const es = new EventSource('/metrics');
+    es.onmessage = e => {
+      const d = JSON.parse(e.data);
+
+      if (d.gpu_util != null) {
+        gpuUtilEl.textContent = d.gpu_util.toFixed(0) + '%';
+        gpuBarEl.style.width = d.gpu_util + '%';
+      } else {
+        gpuUtilEl.textContent = '—';
+        gpuBarEl.style.width = '0%';
+      }
+      gpuWEl.textContent = d.gpu_w != null ? d.gpu_w.toFixed(1) + 'W' : '';
+
+      if (d.cpu_util != null) {
+        cpuUtilEl.textContent = d.cpu_util.toFixed(0) + '%';
+        cpuBarEl.style.width = d.cpu_util + '%';
+      }
+      cpuWEl.textContent = d.cpu_w != null ? d.cpu_w.toFixed(1) + 'W' : '';
+
+      if (d.ram_used_gb != null && d.ram_total_gb != null) {
+        const pct = (d.ram_used_gb / d.ram_total_gb) * 100;
+        ramValEl.textContent = d.ram_used_gb + ' / ' + d.ram_total_gb + ' GB';
+        ramBarEl.style.width = pct + '%';
+      }
+
+      tpsValEl.textContent = d.tps != null ? d.tps.toFixed(1) : '—';
+    };
+    es.onerror = () => { es.close(); setTimeout(startMetrics, 3000); };
+  }
+
   // --- Init ---
   async function init() {
     await Promise.all([loadInfo(), loadModels(), loadPersonas()]);
+    startMetrics();
   }
 
   async function loadInfo() {
