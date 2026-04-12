@@ -28,6 +28,10 @@ def main():
     serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8080)
 
+    monitor_p = sub.add_parser("monitor", help="Live GPU/CPU/RAM dashboard")
+    monitor_p.add_argument("--server", default="http://127.0.0.1:8080", help="Running server URL for tok/s (default: auto-detect)")
+    monitor_p.add_argument("--no-server", action="store_true", help="Skip server detection, use local powermetrics only")
+
     args = parser.parse_args()
 
     system = _resolve_system(args)
@@ -41,6 +45,9 @@ def main():
     elif args.command == "serve":
         from src import server
         server.serve(args.model, args.host, args.port, system)
+    elif args.command == "monitor":
+        from src import monitor_tui
+        monitor_tui.run(args.server, args.no_server)
     else:
         chat.run(args.model, args.max_tokens, args.temp, args.image, system)
 
