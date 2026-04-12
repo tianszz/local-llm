@@ -4,3 +4,4 @@ transformers>=5.1.0,<5.4.0
 fastapi
 uvicorn
 psutil
+rich

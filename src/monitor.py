@@ -38,25 +38,25 @@ def _update_psutil():
 
 def _parse_plist(chunk: bytes):
     try:
-        data = plistlib.loads(chunk)
+        data = plistlib.loads(chunk.lstrip(b"\x00"))
     except Exception:
         return
 
     with _lock:
-        # GPU utilization — key varies by macOS version
-        gpu = data.get("gpu") or data.get("GPU") or {}
-        active = gpu.get("active_ratio") or gpu.get("Active Ratio")
-        if active is not None:
-            _stats["gpu_util"] = round(float(active) * 100, 1)
+        # GPU utilization: idle_ratio is fraction of time idle
+        gpu = data.get("gpu") or {}
+        idle = gpu.get("idle_ratio")
+        if idle is not None:
+            _stats["gpu_util"] = round((1.0 - float(idle)) * 100, 1)
 
-        # Power figures live under "processor"
+        # Power figures are in mW under "processor"
         proc = data.get("processor") or {}
-        gpu_w = proc.get("gpu_w")
-        cpu_w = proc.get("cpu_w")
-        if gpu_w is not None:
-            _stats["gpu_w"] = round(float(gpu_w), 1)
-        if cpu_w is not None:
-            _stats["cpu_w"] = round(float(cpu_w), 1)
+        gpu_mw = proc.get("gpu_power")
+        cpu_mw = proc.get("cpu_power")
+        if gpu_mw is not None:
+            _stats["gpu_w"] = round(float(gpu_mw) / 1000, 2)
+        if cpu_mw is not None:
+            _stats["cpu_w"] = round(float(cpu_mw) / 1000, 2)
 
 
 def _powermetrics_thread(proc):
@@ -83,12 +83,13 @@ def start():
     _running = True
     _update_psutil()   # immediate first read
 
-    cmd = [
-        "sudo", "-n", "powermetrics",
+    import os
+    prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+    cmd = prefix + [
+        "powermetrics",
         "--samplers", "gpu_power,cpu_power",
         "-f", "plist",
         "-i", "1000",
-        "-n", "0",
     ]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
