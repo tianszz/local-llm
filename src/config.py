@@ -10,7 +10,7 @@ os.environ["HF_HUB_CACHE"] = str(MODELS_DIR)
 
 DEFAULTS = {
     "default_model": "mlx-community/Qwen2.5-7B-Instruct-4bit",
-    "max_tokens": 512,
+    "max_tokens": 4096,
     "temp": 0.7,
 }
 
