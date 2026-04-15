@@ -153,14 +153,14 @@ class TokenRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     prompt: str
-    max_tokens: int = 512
+    max_tokens: int = 4096
     temp: float = 0.7
 
 
 class ChatRequest(BaseModel):
     messages: list
     image: str = None
-    max_tokens: int = 512
+    max_tokens: int = 4096
     temp: float = 0.7
 
 
