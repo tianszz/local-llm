@@ -63,7 +63,7 @@ def is_vision_model(model_id):
         return "vision_config" in cfg or "vl" in cfg.get("model_type", "").lower()
     # Fallback to name heuristic if not downloaded yet
     name = model_id.lower()
-    return any(k in name for k in ["-vl", "vision", "vlm"])
+    return any(k in name for k in ["-vl", "vision", "vlm", "gemma-4"])
 
 
 def snapshot_path(model_id):
