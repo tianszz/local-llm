@@ -122,13 +122,20 @@ def _prepend_system(messages):
     return messages
 
 
-def _apply_chat_template(messages, image_b64=None):
+def _apply_chat_template(messages, image_b64=None, tools=None):
     if _is_vlm:
         from mlx_vlm.prompt_utils import apply_chat_template
         prompt = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
         num_images = 1 if image_b64 else 0
         return apply_chat_template(_processor, _vlm_config, prompt, num_images=num_images)
-    return _tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    kwargs = {"tokenize": False, "add_generation_prompt": True}
+    if tools:
+        kwargs["tools"] = tools
+    try:
+        return _tokenizer.apply_chat_template(messages, **kwargs)
+    except Exception:
+        kwargs.pop("tools", None)
+        return _tokenizer.apply_chat_template(messages, **kwargs)
 
 
 def _stream_response(prompt_text, image_b64, max_tokens, temp):
@@ -171,6 +178,8 @@ class OpenAIRequest(BaseModel):
     max_tokens: int = None
     temperature: float = None
     stream: bool = False
+    tools: list = None
+    tool_choice: str = "auto"
 
 
 # --- Endpoints ---
@@ -281,18 +290,20 @@ def chat(req: ChatRequest):
 @app.post("/v1/chat/completions")
 def openai_chat(req: OpenAIRequest):
     from src.config import load as load_cfg
+    from src.tools import parse_tool_calls, strip_tool_calls
     cfg = load_cfg()
     max_tokens = req.max_tokens or cfg["max_tokens"]
     temp = req.temperature if req.temperature is not None else cfg["temp"]
 
     messages = _prepend_system(req.messages)
-    prompt_text = _apply_chat_template(messages, req.image)
+    prompt_text = _apply_chat_template(messages, req.image, req.tools)
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
     model_name = req.model or _model_id
     created = int(time.time())
 
-    if req.stream:
+    # Buffer output when tools are present — tool call detection requires the full text.
+    if req.stream and not req.tools:
         def event_stream():
             global _last_tps
             stats = None
@@ -327,18 +338,46 @@ def openai_chat(req: OpenAIRequest):
     for item in _stream_response(prompt_text, req.image, max_tokens, temp):
         if isinstance(item, dict):
             stats = item
+            _last_tps = item.get("tps")
         else:
             tokens.append(item)
-    response = "".join(tokens)
+    full_text = "".join(tokens)
+
+    tool_calls_parsed = parse_tool_calls(full_text) if req.tools else []
+
+    if tool_calls_parsed:
+        content = strip_tool_calls(full_text)
+        finish_reason = "tool_calls"
+        tool_calls_field = [
+            {
+                "id": tc["id"],
+                "type": "function",
+                "function": {"name": tc["name"], "arguments": tc["arguments"]},
+            }
+            for tc in tool_calls_parsed
+        ]
+        message = {"role": "assistant", "content": content, "tool_calls": tool_calls_field}
+    else:
+        finish_reason = "stop"
+        message = {"role": "assistant", "content": full_text}
+
     result = {
         "id": completion_id,
         "object": "chat.completion",
         "created": created,
         "model": model_name,
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
+        "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
     }
     if stats:
         result["stats"] = stats
+
+    if req.stream:
+        # tools were present; emit as a single SSE chunk + DONE
+        def tool_stream():
+            yield f"data: {json.dumps({**result, 'object': 'chat.completion.chunk'})}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(tool_stream(), media_type="text/event-stream")
+
     return result
 
 

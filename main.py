@@ -13,6 +13,7 @@ def main():
     parser.add_argument("--image", help="Image path (vision models only)")
     parser.add_argument("--system", help="System prompt for this session")
     parser.add_argument("--persona", help="Named persona from ~/.local-llm/personas/")
+    parser.add_argument("--tools", action="store_true", help="Enable built-in tools (shell, read_file) with agentic loop")
 
     sub = parser.add_subparsers(dest="command")
 
@@ -49,7 +50,7 @@ def main():
         from src import monitor_tui
         monitor_tui.run(args.server, args.no_server)
     else:
-        chat.run(args.model, args.max_tokens, args.temp, args.image, system)
+        chat.run(args.model, args.max_tokens, args.temp, args.image, system, args.tools)
 
 
 def _resolve_system(args):
